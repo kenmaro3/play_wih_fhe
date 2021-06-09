@@ -84,7 +84,7 @@ fn bs_max_example(folder:&str){
     // encoders
     let ecd1 = Encoder::new(-10., 10., 8, 4).unwrap();
     let ecd2 = Encoder::new(-10., 10., 8, 4).unwrap();
-    let ecd_out = Encoder::new(0., 10., 8, 4).unwrap();
+    let ecd_out = Encoder::new(-10., 10., 8, 4).unwrap();
 
     let(rlwe_key, lwe_key1, lwe_key2, bsk, ksk_1_2, ksk_2_1) = load_keys(folder);
 
@@ -482,28 +482,24 @@ fn generate_ksk(k1: &LWESecretKey, k2: &LWESecretKey ) -> (LWEKSK, LWEKSK){
     return (ksk_1_2, ksk_2_1);
 }
 
-fn generate_bsk(rlwe_key: &RLWESecretKey, lwe_key1: &LWESecretKey) -> LWEBSK{
-    // settings
-    let base_log: usize = 4;
-    let level: usize = 4;
-
-    let bsk = LWEBSK::new(&lwe_key1, &rlwe_key, base_log, level);
+fn generate_bsk(rlwe_key: &RLWESecretKey, lwe_key1: &LWESecretKey, beta: usize, level: usize) -> LWEBSK{
+    let bsk = LWEBSK::new(&lwe_key1, &rlwe_key, beta, level);
     println!("generated bsk");
     return bsk;
 }
 
 
-fn generate_keys() -> (RLWESecretKey, LWESecretKey, LWESecretKey, LWEBSK, LWEKSK, LWEKSK){
+fn generate_keys(beta:usize, level:usize) -> (RLWESecretKey, LWESecretKey, LWESecretKey, LWEBSK, LWEKSK, LWEKSK){
     let rlwe_key = generate_rlwe_key();
     let (lwe_key1, lwe_key2) = generate_lwe_key_lwe_key(&rlwe_key);
-    let bsk = generate_bsk(&rlwe_key, &lwe_key1);
+    let bsk = generate_bsk(&rlwe_key, &lwe_key1, beta, level);
     let (ksk_1_2, ksk_2_1) = generate_ksk(&lwe_key1, &lwe_key2);
     return (rlwe_key, lwe_key1, lwe_key2, bsk, ksk_1_2, ksk_2_1);
 }
 
-fn generate_and_save_keys(folder: &str){
+fn generate_and_save_keys(folder: &str, beta: usize, level: usize){
     //let folder_path = folder.to_string();
-    let (rlwe_key, lwe_key1, lwe_key2, bsk, ksk_1_2, ksk_2_1) = generate_keys();
+    let (rlwe_key, lwe_key1, lwe_key2, bsk, ksk_1_2, ksk_2_1) = generate_keys(beta, level);
     let mut tmp_path = folder.to_string() + "/rlwe_key.json";
     rlwe_key.save(&tmp_path);
     tmp_path = folder.to_string() + "/lwe_key1.json";
@@ -761,9 +757,36 @@ fn main() {
 
 
     // for generating keys and save them in ./keys1
-    let key_folder = String::from("keys3");
-    generate_and_save_keys(&key_folder);
+    let mut key_folder = String::from("keys5");
+    let mut beta:usize = 4;
+    let mut level:usize = 6;
+    generate_and_save_keys(&key_folder, beta, level);
 
+    key_folder = String::from("keys6");
+    beta = 4;
+    level = 7;
+    generate_and_save_keys(&key_folder, beta, level);
+
+    key_folder = String::from("keys7");
+    beta = 4;
+    level = 8;
+    generate_and_save_keys(&key_folder, beta, level);
+
+    // for generating keys and save them in ./keys1
+    key_folder = String::from("keys8");
+    beta = 3;
+    level = 8;
+    generate_and_save_keys(&key_folder, beta, level);
+
+    key_folder = String::from("keys9");
+    beta = 3;
+    level = 9;
+    generate_and_save_keys(&key_folder, beta, level);
+
+    key_folder = String::from("keys10");
+    beta = 3;
+    level = 10;
+    generate_and_save_keys(&key_folder, beta, level);
 
     //generate_bsk(&key_folder);
     //add_example(&key_folder);
