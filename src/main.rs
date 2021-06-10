@@ -1,7 +1,9 @@
 use concrete::*;
 use std::time::{Duration, Instant};
 use itertools::izip;
-
+use std::io::prelude::*;
+use std::fs::File; use std::io::{BufReader}; 
+use ndarray::{Array1, Array2, Array3, arr1, arr2, arr3}; 
 
 fn mul_ctxt_message_example(folder:&str){
     println!("\n\n=======================================");
@@ -11,8 +13,7 @@ fn mul_ctxt_message_example(folder:&str){
     let encoder = Encoder::new(-2., 6., 4, 4).unwrap();
 
     let(rlwe_key, lwe_key1, lwe_key2, bsk, ksk_1_2, ksk_2_1) = load_keys(folder);
-
-    // two lists of messages
+// two lists of messages
     let messages_1: Vec<f64> = vec![-1., 2., 0., 5., -0.5];
     let messages_2: Vec<f64> = vec![-2., -1., 3., 2.5, 1.5];
 
@@ -290,8 +291,8 @@ fn add_example(folder:&str){
        VectorLWE::encode_encrypt(&lwe_key1, &messages_1, &encoder_1).unwrap();
    let ciphertext_2 = VectorLWE::encode_encrypt(&lwe_key1, &messages_2, &encoder_2).unwrap();
 
-   // subtraction between ciphertext and messages_2
-   ciphertext_1.sub_with_padding_inplace(&ciphertext_2);
+   // addition between ciphertext and messages_2
+   ciphertext_1.add_with_padding_inplace(&ciphertext_2);
 
    // decryption
    let decryptions: Vec<f64> = ciphertext_1.decrypt_decode(&lwe_key1).unwrap();
@@ -462,14 +463,14 @@ fn ks_ks_example(folder:&str){
 }
 
 
-fn generate_rlwe_key() -> RLWESecretKey{
-    let rlwe_secret_key = RLWESecretKey::new(&RLWE128_1024_1);
+fn generate_rlwe_key(rlwe_params: RLWEParams) -> RLWESecretKey{
+    let rlwe_secret_key = RLWESecretKey::new(&rlwe_params);
     println!("generated rlwe_key");
     return rlwe_secret_key;
 }
 
-fn generate_lwe_key_lwe_key(rlwe_key: &RLWESecretKey) -> (LWESecretKey, LWESecretKey){
-    let lwe_key1 = LWESecretKey::new(&LWE128_1024);
+fn generate_lwe_key_lwe_key(rlwe_key: &RLWESecretKey, lwe_params: LWEParams) -> (LWESecretKey, LWESecretKey){
+    let lwe_key1 = LWESecretKey::new(&lwe_params);
     let lwe_key2 = rlwe_key.to_lwe_secret_key();
     println!("generated lwe_key1, lwe_key2");
     return (lwe_key1, lwe_key2);
@@ -489,17 +490,17 @@ fn generate_bsk(rlwe_key: &RLWESecretKey, lwe_key1: &LWESecretKey, beta: usize, 
 }
 
 
-fn generate_keys(beta:usize, level:usize) -> (RLWESecretKey, LWESecretKey, LWESecretKey, LWEBSK, LWEKSK, LWEKSK){
-    let rlwe_key = generate_rlwe_key();
-    let (lwe_key1, lwe_key2) = generate_lwe_key_lwe_key(&rlwe_key);
+fn generate_keys( lwe_params: LWEParams, rlwe_params: RLWEParams,beta:usize, level:usize) -> (RLWESecretKey, LWESecretKey, LWESecretKey, LWEBSK, LWEKSK, LWEKSK){
+    let rlwe_key = generate_rlwe_key(rlwe_params);
+    let (lwe_key1, lwe_key2) = generate_lwe_key_lwe_key(&rlwe_key, lwe_params);
     let bsk = generate_bsk(&rlwe_key, &lwe_key1, beta, level);
     let (ksk_1_2, ksk_2_1) = generate_ksk(&lwe_key1, &lwe_key2);
     return (rlwe_key, lwe_key1, lwe_key2, bsk, ksk_1_2, ksk_2_1);
 }
 
-fn generate_and_save_keys(folder: &str, beta: usize, level: usize){
+fn generate_and_save_keys(folder: &str, lwe_params: LWEParams, rlwe_params: RLWEParams, beta: usize, level: usize){
     //let folder_path = folder.to_string();
-    let (rlwe_key, lwe_key1, lwe_key2, bsk, ksk_1_2, ksk_2_1) = generate_keys(beta, level);
+    let (rlwe_key, lwe_key1, lwe_key2, bsk, ksk_1_2, ksk_2_1) = generate_keys(lwe_params, rlwe_params, beta, level);
     let mut tmp_path = folder.to_string() + "/rlwe_key.json";
     rlwe_key.save(&tmp_path);
     tmp_path = folder.to_string() + "/lwe_key1.json";
@@ -747,6 +748,136 @@ fn mult_ctxt_ctxt_example(folder:&str){
     println!("mult_ctxt_ctxt_example done...");
 }
 
+fn str2vec64(filename:&str) -> Vec<f64>{
+    print!("str2vec64 called\n");
+    let file = File::open(filename).expect("Unable to open file");
+    let reader = BufReader::new(file);
+    let mut val: Vec<f64> =  Vec::new();
+    for line in reader.lines() {
+        val.push(line.unwrap().parse::<f64>().unwrap());
+    }
+    println!("{:?}", val);
+    return val;
+}
+
+fn line_to_num(line_str: &str) -> Vec<f64> {
+    // let mut result1 = Vec::new();
+    // println!("Input str = {}", line_str);
+    let nums = line_str
+        .trim()
+        .split(' ')
+        .flat_map(str::parse::<f64>)
+        .collect::<Vec<_>>();
+    //for num in &nums {
+    //    println!("{}", num);
+    //}
+    return nums;
+}
+
+fn lines_to_num(filepath: &str) -> Vec<Vec<f64>>{
+    let file = File::open(filepath).expect("Unable to open file");
+    let reader = BufReader::new(file);
+    let mut val: Vec<Vec<f64>> = Vec::new();
+    for line in reader.lines() {
+        // val.push(line.unwrap().parse::<f64>().unwrap());
+        let line_str = line.unwrap();
+        // println!("Line string= {:?}", line_str);
+        val.push(line_to_num(&line_str));
+    }
+    //println!("{:?}", val);
+    return val;
+  }
+
+fn vec_to_ndarray_1(x: &Vec<f64>) -> Array1::<f64> {
+  let mut xa = Array1::<f64>::zeros(x.len());
+  //println!("xa: {:?}", xa);
+  for (i, el) in x.iter().enumerate(){
+    xa[i] = x[i];
+  }
+  return xa;
+
+}
+
+
+fn lr_example(folder:&str){
+  println!("hello, logistic_regression");
+  let encoder = Encoder::new(-20., 20., 8, 4).unwrap();
+
+  println!("debug-2");
+  let w = lines_to_num("w.txt");
+  let b = lines_to_num("b.txt");
+  let x = lines_to_num("x.txt");
+
+  println!("debug-1");
+  let wa = vec_to_ndarray_1(&w[0]);
+  let ba = vec_to_ndarray_1(&b[0]);
+  let xa = vec_to_ndarray_1(&x[0]);
+  
+  println!("wa: {:?}", wa);
+  println!("ba: {:?}", ba);
+  println!("xa: {:?}", xa);
+
+  println!("debug-0");
+  let tmp1 = wa.dot(&xa);
+  let tmp2 = tmp1 + ba;
+  let tmp3 = raw_sigmoid(tmp2[0]);
+  println!("{:?}", tmp1);
+  println!("{:?}", tmp2);
+  println!("{:?}", tmp3);
+  println!("debug0");
+
+
+  let(rlwe_key, lwe_key1, lwe_key2, bsk, ksk_1_2, ksk_2_1) = load_keys(folder);
+
+  // encode and encrypt
+  let mut c1 = VectorRLWE::encode_encrypt(&rlwe_key, &x[0], &encoder).unwrap();
+
+  // multiplication between ciphertext and messages_2
+  let max_constant: f64 = 5.;
+  let scalar_precision: usize = 4;
+  c1.mul_constant_with_padding_inplace(&w[0], max_constant, scalar_precision).unwrap();
+
+  println!("debug1");
+  //let lwe_ct = c1.extract_1_lwe(0, 0).unwrap();
+  //// decrypt
+  //println!("debug2");
+  //let decryption = lwe_ct.decrypt_decode(&lwe_key1).unwrap();
+  //println!("decryption of lwe: {}", decryption[0]);
+  //c1.add_with_padding_inplace(&b[0]);
+
+  // decryption
+  let (decryptions, dec_encoders) = c1.decrypt_with_encoders(&rlwe_key).unwrap();
+
+  for d in decryptions.iter(){
+    print!("{}, ", d);
+  }
+  println!();
+}
+
+
+fn extract_example(){
+    // encoder
+    let encoder = Encoder::new(-10., 10., 8, 2).unwrap();
+
+    // generate a fresh secret key
+    let secret_key = RLWESecretKey::new(&RLWE128_1024_1);
+
+    // a list of messages
+    let messages: Vec<f64> = vec![-6.276, 4.3, 0.12, -1.1, 7.78];
+
+    // encode and encrypt
+    //let plaintext = Plaintext::encode(&messages, &encoder).unwrap();
+    let rlwe_ct = VectorRLWE::encode_encrypt_packed(&secret_key, &messages, &encoder).unwrap();
+    println!("debug0");
+
+    // extraction of the coefficient indexed by 2 (0.12)
+    // in the RLWE ciphertext indexed by 0
+    let lwe_ct = rlwe_ct.extract_1_lwe(0, 0).unwrap();
+
+    println!("Well done :-)");
+
+} 
+
 fn main() {
     println!("\nHello, world!\n");
 
@@ -757,36 +888,43 @@ fn main() {
 
 
     // for generating keys and save them in ./keys1
-    let mut key_folder = String::from("keys5");
-    let mut beta:usize = 4;
-    let mut level:usize = 6;
-    generate_and_save_keys(&key_folder, beta, level);
+    let mut key_folder = String::from("keys2");
+    //let lwe_param = LWE80_2048;
+    //let rlwe_param = RLWE80_2048_1;
+    //let mut beta:usize = 4;
+    //let mut level:usize = 5;
+    //generate_and_save_keys(&key_folder, lwe_param, rlwe_param, beta, level);
 
-    key_folder = String::from("keys6");
-    beta = 4;
-    level = 7;
-    generate_and_save_keys(&key_folder, beta, level);
+    //key_folder = String::from("keys12");
+    //beta = 4;
+    //level = 6;
+    //generate_and_save_keys(&key_folder, lwe_param, rlwe_param, beta, level);
 
-    key_folder = String::from("keys7");
-    beta = 4;
-    level = 8;
-    generate_and_save_keys(&key_folder, beta, level);
+    //key_folder = String::from("keys13");
+    //beta = 4;
+    //level = 7;
+    //generate_and_save_keys(&key_folder, lwe_param, rlwe_param, beta, level);
 
-    // for generating keys and save them in ./keys1
-    key_folder = String::from("keys8");
-    beta = 3;
-    level = 8;
-    generate_and_save_keys(&key_folder, beta, level);
+    //key_folder = String::from("keys14");
+    //beta = 4;
+    //level = 8;
+    //generate_and_save_keys(&key_folder, lwe_param, rlwe_param, beta, level);
 
-    key_folder = String::from("keys9");
-    beta = 3;
-    level = 9;
-    generate_and_save_keys(&key_folder, beta, level);
+    //// for generating keys and save them in ./keys1
+    //key_folder = String::from("keys15");
+    //beta = 3;
+    //level = 8;
+    //generate_and_save_keys(&key_folder, lwe_param, rlwe_param, beta, level);
 
-    key_folder = String::from("keys10");
-    beta = 3;
-    level = 10;
-    generate_and_save_keys(&key_folder, beta, level);
+    //key_folder = String::from("keys16");
+    //beta = 3;
+    //level = 9;
+    //generate_and_save_keys(&key_folder, lwe_param, rlwe_param, beta, level);
+
+    //key_folder = String::from("keys17");
+    //beta = 3;
+    //level = 10;
+    //generate_and_save_keys(&key_folder, lwe_param, rlwe_param, beta, level);
 
     //generate_bsk(&key_folder);
     //add_example(&key_folder);
@@ -801,6 +939,9 @@ fn main() {
     //bs_ks_example(&key_folder);
     //bs_relu_example(&key_folder);
     //bs_sigmoid_example(&key_folder);
+
     //bs_max_example(&key_folder);
+    //lr_example(&key_folder);
+    extract_example();
 
 }
